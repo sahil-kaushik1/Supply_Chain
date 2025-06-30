@@ -1,0 +1,5 @@
+[workspace]
+members = [
+    "src/suppy_chain_backend"
+]
+resolver = "2"

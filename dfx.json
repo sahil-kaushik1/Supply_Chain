@@ -1,0 +1,27 @@
+{
+  "canisters": {
+    "suppy_chain_backend": {
+      "candid": "src/suppy_chain_backend/suppy_chain_backend.did",
+      "package": "suppy_chain_backend",
+      "type": "rust"
+    },
+    "suppy_chain_frontend": {
+      "dependencies": [
+        "suppy_chain_backend"
+      ],
+      "source": [
+        "src/suppy_chain_frontend/dist"
+      ],
+      "type": "assets",
+      "workspace": "suppy_chain_frontend"
+    }
+  },
+  "defaults": {
+    "build": {
+      "args": "",
+      "packtool": ""
+    }
+  },
+  "output_env_file": ".env",
+  "version": 1
+}
