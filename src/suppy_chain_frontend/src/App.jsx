@@ -1,30 +1,24 @@
-import { useState } from 'react';
-import { suppy_chain_backend } from 'declarations/suppy_chain_backend';
+import React from 'react';
+import { Routes, Route } from 'react-router-dom';
+import FrontPage from './pages/FrontPage';
+import LoginPage from './pages/LoginPage';
+import Dashboard from './pages/Dashboard';
+import Supplier from './pages/Supplier';
+import Transporter from './pages/Transporter';
+import Retailer from './pages/Retailer';
+import Consumer from './pages/Consumer';
 
 function App() {
-  const [greeting, setGreeting] = useState('');
-
-  function handleSubmit(event) {
-    event.preventDefault();
-    const name = event.target.elements.name.value;
-    suppy_chain_backend.greet(name).then((greeting) => {
-      setGreeting(greeting);
-    });
-    return false;
-  }
-
   return (
-    <main>
-      <img src="/logo2.svg" alt="DFINITY logo" />
-      <br />
-      <br />
-      <form action="#" onSubmit={handleSubmit}>
-        <label htmlFor="name">Enter your name: &nbsp;</label>
-        <input id="name" alt="Name" type="text" />
-        <button type="submit">Click Me!</button>
-      </form>
-      <section id="greeting">{greeting}</section>
-    </main>
+    <Routes>
+      <Route path="/" element={<FrontPage />} />         {/* FrontPage shown on / */}
+      <Route path="/login" element={<LoginPage />} />     {/* LoginPage on /login */}
+      <Route path="/dashboard" element={<Dashboard />} /> {/* Dashboard now on /dashboard */}
+      <Route path="/supplier" element={<Supplier />} />
+      <Route path="/transporter" element={<Transporter />} />
+      <Route path="/retailer" element={<Retailer />} />
+      <Route path="/consumer" element={<Consumer />} />
+    </Routes>
   );
 }
 
