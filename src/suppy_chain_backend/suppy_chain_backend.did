@@ -1,3 +1,25 @@
-service : {
-    "greet": (text) -> (text) query;
+type Event = record {
+  id : nat64;
+  actor : principal;
+  product_id : text;
+  metadata : text;
+  timestamp : nat64;
+  location : text;
+  event_type : text;
+};
+type Result = variant { Ok; Err : text };
+type Result_1 = variant { Ok : nat64; Err : text };
+type Result_2 = variant { Ok : vec Event; Err : text };
+type Result_3 = variant { Ok : bool; Err : text };
+type Role = variant { Transporter; Supplier; Auditor; Retailer; Warehouse };
+service : () -> {
+  add_rating : (principal, nat8) -> (Result);
+  add_report : (principal, text, text) -> (Result_1);
+  get_events_since : (nat64) -> (vec Event) query;
+  get_product_history : (text) -> (Result_2) query;
+  get_rating : (principal) -> (opt float64) query;
+  record_event : (text, text, text, text) -> (Result_1);
+  register_user : (Role) -> (Result);
+  resolve_report : (nat64, bool) -> (Result);
+  verify_product : (text) -> (Result_3) query;
 }
