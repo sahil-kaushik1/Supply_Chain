@@ -7,7 +7,7 @@ export default function Consumer() {
 
   const handleTrack = async () => {
     try {
-      setStatus('⏳ Fetching journey...');
+      setStatus(' Fetching journey...');
       // TODO: Connect to backend function like: get_product_status(productId)
       console.log('Tracking product:', productId);
 
@@ -24,7 +24,7 @@ export default function Consumer() {
       setStatus('');
     } catch (err) {
       console.error(err);
-      setStatus('❌ Failed to fetch journey.');
+      setStatus(' Failed to fetch journey.');
     }
   };
 

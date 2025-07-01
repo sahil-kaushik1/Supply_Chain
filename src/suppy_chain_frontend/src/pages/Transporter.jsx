@@ -7,13 +7,13 @@ export default function Transporter() {
 
   const handleUpdate = async () => {
     try {
-      setStatus('⏳ Updating...');
+      setStatus(' Updating...');
       // TODO: Connect to backend function like: update_status(productId, statusUpdate)
       console.log('Transporter updated:', productId, statusUpdate);
       setStatus('✅ Status updated (mock)');
     } catch (err) {
       console.error(err);
-      setStatus('❌ Failed to update status.');
+      setStatus(' Failed to update status.');
     }
   };
 

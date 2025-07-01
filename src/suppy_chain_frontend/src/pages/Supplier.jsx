@@ -9,7 +9,7 @@ export default function Supplier() {
 
 const handleRegister = async () => {
   try {
-    setStatus('⏳ Sending to backend...');
+    setStatus(' Sending to backend...');
 
     // TEMP: call greet() instead of register_product
     const response = await suppy_chain_backend.greet(productName);
@@ -17,7 +17,7 @@ const handleRegister = async () => {
     setStatus('✅ Backend says: ' + response);
   } catch (err) {
     console.error(err);
-    setStatus('❌ Failed to contact backend.');
+    setStatus(' Failed to contact backend.');
   }
 };
 
