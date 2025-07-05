@@ -16,6 +16,13 @@
     "src/suppy_chain_frontend"
   ],
   "dependencies": {
+    "framer-motion": "^12.23.0",
+    "lucide-react": "^0.525.0",
     "react-router-dom": "^7.6.3"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.17"
   }
 }

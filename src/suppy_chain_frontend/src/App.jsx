@@ -1,25 +1,22 @@
-import React from 'react';
-import { Routes, Route } from 'react-router-dom';
-import FrontPage from './pages/FrontPage';
-import LoginPage from './pages/LoginPage';
-import Dashboard from './pages/Dashboard';
-import Supplier from './pages/Supplier';
-import Transporter from './pages/Transporter';
-import Retailer from './pages/Retailer';
-import Consumer from './pages/Consumer';
+// import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Home from "./pages/Home.jsx";
+import Login from "./pages/login.jsx";
+import Register from "./pages/register.jsx";
+import Dashboard from "./pages/dashboard.jsx";
+import Settings from "./pages/setting.jsx";
+import Layout from "./components/Layout.jsx";
 
-function App() {
+import { Routes, Route } from "react-router-dom";
+
+export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<FrontPage />} />         {/* FrontPage shown on / */}
-      <Route path="/login" element={<LoginPage />} />     {/* LoginPage on /login */}
-      <Route path="/dashboard" element={<Dashboard />} /> {/* Dashboard now on /dashboard */}
-      <Route path="/supplier" element={<Supplier />} />
-      <Route path="/transporter" element={<Transporter />} />
-      <Route path="/retailer" element={<Retailer />} />
-      <Route path="/consumer" element={<Consumer />} />
+      {/* ...routes */}
+      <Route path="/" element={<Home />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
+      <Route path="/dashboard" element={<Dashboard />} />
+      <Route path="/settings" element={<Settings />} />
     </Routes>
   );
 }
-
-export default App;
