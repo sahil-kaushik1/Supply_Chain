@@ -1,0 +1,59 @@
+type Rating = record {
+    id: text;
+    rater_id: principal;
+    rated_user_id: principal;
+    product_id: opt text;
+    transaction_id: opt text;
+    rating: nat8;
+    review: text;
+    category: text;
+    created_at: nat64;
+    is_verified: bool;
+};
+
+type UserRatingStats = record {
+    user_id: principal;
+    total_ratings: nat32;
+    average_rating: float64;
+    star_distribution: vec nat32;
+    category_ratings: vec record { text; float64 };
+    last_updated: nat64;
+};
+
+type RatingReport = record {
+    id: text;
+    reporter_id: principal;
+    rating_id: text;
+    reason: text;
+    description: text;
+    created_at: nat64;
+    status: text;
+};
+
+type RatingResult = variant {
+    Ok: Rating;
+    Err: text;
+};
+
+type StatsResult = variant {
+    Ok: UserRatingStats;
+    Err: text;
+};
+
+type ReportResult = variant {
+    Ok: RatingReport;
+    Err: text;
+};
+
+service : {
+    submit_rating: (principal, opt text, opt text, nat8, text, text) -> (RatingResult);
+    verify_rating: (text) -> (RatingResult);
+    report_rating: (text, text, text) -> (ReportResult);
+    get_rating: (text) -> (RatingResult) query;
+    get_user_ratings: (principal) -> (vec Rating) query;
+    get_ratings_by_rater: (principal) -> (vec Rating) query;
+    get_user_rating_stats: (principal) -> (StatsResult) query;
+    get_top_rated_users: (nat32) -> (vec UserRatingStats) query;
+    get_ratings_by_category: (text) -> (vec Rating) query;
+    get_pending_reports: () -> (vec RatingReport) query;
+}

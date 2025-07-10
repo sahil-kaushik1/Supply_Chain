@@ -1,5 +1,10 @@
 [workspace]
+
 members = [
-    "src/supply_chain_backend"
+    "src/supply_chain_backend",
+    "src/rating_backend",
+    "src/reporting_backend",
+    "src/user_management_backend",
 ]
+
 resolver = "2"

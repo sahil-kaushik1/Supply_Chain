@@ -1,0 +1,63 @@
+type Report = record {
+    id: text;
+    title: text;
+    report_type: text;
+    generated_by: principal;
+    created_at: nat64;
+    data: vec record { text; text };
+    summary: text;
+    period_start: nat64;
+    period_end: nat64;
+    is_public: bool;
+};
+
+type PerformanceMetrics = record {
+    user_id: principal;
+    total_transactions: nat32;
+    successful_transactions: nat32;
+    failed_transactions: nat32;
+    average_delivery_time: float64;
+    customer_satisfaction: float64;
+    reliability_score: float64;
+    last_updated: nat64;
+};
+
+type SupplyChainAnalytics = record {
+    total_products: nat32;
+    products_in_transit: nat32;
+    products_delivered: nat32;
+    products_lost_damaged: nat32;
+    average_transit_time: float64;
+    top_performers: vec principal;
+    bottlenecks: vec text;
+    generated_at: nat64;
+};
+
+type ReportResult = variant {
+    Ok: Report;
+    Err: text;
+};
+
+type MetricsResult = variant {
+    Ok: PerformanceMetrics;
+    Err: text;
+};
+
+type AnalyticsResult = variant {
+    Ok: SupplyChainAnalytics;
+    Err: text;
+};
+
+service : {
+    generate_report: (text, text, nat64, nat64, bool) -> (ReportResult);
+    update_performance_metrics: (principal, nat32, nat32, nat32, float64, float64) -> (MetricsResult);
+    generate_analytics: () -> (AnalyticsResult);
+    get_report: (text) -> (ReportResult) query;
+    get_reports_by_user: (principal) -> (vec Report) query;
+    get_public_reports: () -> (vec Report) query;
+    get_reports_by_type: (text) -> (vec Report) query;
+    get_performance_metrics: (principal) -> (MetricsResult) query;
+    get_all_performance_metrics: () -> (vec PerformanceMetrics) query;
+    get_latest_analytics: () -> (AnalyticsResult) query;
+    get_top_performers: (nat32) -> (vec PerformanceMetrics) query;
+}

@@ -1,3 +1,83 @@
+type UserRole = variant {
+    Supplier;
+    Transporter;
+    Warehouse;
+    Retailer;
+    Admin;
+};
+
+type ProductStatus = variant {
+    Created;
+    InWarehouse;
+    InTransit;
+    Delivered;
+    Sold;
+    Lost;
+    Damaged;
+};
+
+type Product = record {
+    id: text;
+    name: text;
+    description: text;
+    supplier_id: principal;
+    current_owner: principal;
+    status: ProductStatus;
+    created_at: nat64;
+    updated_at: nat64;
+    batch_number: text;
+    expiry_date: opt nat64;
+    price: float64;
+    quantity: nat32;
+    category: text;
+    origin: text;
+    certifications: vec text;
+};
+
+type TrackingEvent = record {
+    id: text;
+    product_id: text;
+    user_id: principal;
+    user_role: UserRole;
+    event_type: text;
+    description: text;
+    location: text;
+    timestamp: nat64;
+    metadata: vec record { text; text };
+};
+
+type Transfer = record {
+    id: text;
+    product_id: text;
+    from_user: principal;
+    to_user: principal;
+    transfer_type: text;
+    status: text;
+    initiated_at: nat64;
+    completed_at: opt nat64;
+    notes: text;
+};
+
+type Result = variant {
+    Ok: Product;
+    Err: text;
+};
+
+type TransferResult = variant {
+    Ok: Transfer;
+    Err: text;
+};
+
 service : {
-    "greet": (text) -> (text) query;
+    create_product: (text, text, text, opt nat64, float64, nat32, text, text, vec text) -> (Result);
+    transfer_product: (text, principal, text, text) -> (TransferResult);
+    update_product_status: (text, ProductStatus, text, text) -> (Result);
+    get_product: (text) -> (Result) query;
+    get_products_by_owner: (principal) -> (vec Product) query;
+    get_product_tracking_history: (text) -> (vec TrackingEvent) query;
+    get_all_products: () -> (vec Product) query;
+    get_products_by_status: (ProductStatus) -> (vec Product) query;
+    get_transfers_by_user: (principal) -> (vec Transfer) query;
+    complete_transfer: (text) -> (TransferResult);
+    get_statistics: () -> (nat64, nat64, nat64) query;
 }

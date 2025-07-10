@@ -1,41 +1,388 @@
+/* Global Styles with Animations */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
 body {
-  font-family: sans-serif;
-  font-size: 1.5rem;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 100vh;
+  animation: backgroundShift 10s ease-in-out infinite alternate;
 }
 
-img {
-  max-width: 50vw;
-  max-height: 25vw;
-  display: block;
-  margin: auto;
+@keyframes backgroundShift {
+  0% {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  }
+
+  100% {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  }
 }
 
-form {
+/* Page Container */
+.suppliers-container,
+.warehouses-container,
+.transporters-container,
+.retailers-container,
+.dashboard-container {
+  padding: 24px;
+  min-height: 100vh;
+  position: relative;
+}
+
+.suppliers-container::before,
+.warehouses-container::before,
+.transporters-container::before,
+.retailers-container::before,
+.dashboard-container::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="50" cy="50" r="0.5" fill="rgba(255,255,255,0.1)"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Page Header */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  animation: slideInFromTop 0.6s ease-out;
+}
+
+.page-header h1 {
+  color: #fff;
+  font-size: 2.5rem;
+  font-weight: 700;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+  margin: 0;
+}
+
+@keyframes slideInFromTop {
+  from {
+    transform: translateY(-30px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Statistics Cards */
+.stat-card {
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: all 0.3s ease;
+  animation: fadeInUp 0.6s ease-out;
+}
+
+.stat-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.15);
+  background: rgba(255, 255, 255, 0.95);
+}
+
+@keyframes fadeInUp {
+  from {
+    transform: translateY(30px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Table Cards */
+.suppliers-table-card,
+.warehouses-table-card,
+.products-table-card {
+  border-radius: 16px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(15px);
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  animation: slideInFromBottom 0.8s ease-out;
+}
+
+@keyframes slideInFromBottom {
+  from {
+    transform: translateY(50px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Table Styling */
+.ant-table {
+  background: transparent;
+}
+
+.ant-table-thead>tr>th {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  font-weight: 600;
+  border: none;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.ant-table-tbody>tr {
+  transition: all 0.3s ease;
+}
+
+.ant-table-tbody>tr:hover {
+  background: rgba(102, 126, 234, 0.1);
+  transform: scale(1.01);
+}
+
+/* Buttons */
+.create-product-btn,
+.ant-btn-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  border-radius: 8px;
+  height: 40px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.create-product-btn::before,
+.ant-btn-primary::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transition: left 0.5s ease;
+}
+
+.create-product-btn:hover::before,
+.ant-btn-primary:hover::before {
+  left: 100%;
+}
+
+.create-product-btn:hover,
+.ant-btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+}
+
+/* Modal Styling */
+.create-product-modal .ant-modal-content,
+.ant-modal-content {
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(15px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.ant-modal-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 16px 16px 0 0;
+  border: none;
+}
+
+.ant-modal-title {
+  color: white;
+  font-weight: 600;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.ant-modal-close {
+  color: white;
+}
+
+/* Form Styling */
+.ant-form-item-label>label {
+  font-weight: 600;
+  color: #333;
+}
+
+.ant-input,
+.ant-input-number,
+.ant-select-selector,
+.ant-picker {
+  border-radius: 8px;
+  border: 2px solid #e1e5e9;
+  transition: all 0.3s ease;
+}
+
+.ant-input:focus,
+.ant-input-number:focus,
+.ant-select-focused .ant-select-selector,
+.ant-picker:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+  transform: translateY(-1px);
+}
+
+/* Loading Container */
+.loading-container {
   display: flex;
   justify-content: center;
-  gap: 0.5em;
-  flex-flow: row wrap;
-  max-width: 40vw;
-  margin: auto;
-  align-items: baseline;
+  align-items: center;
+  height: 400px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  backdrop-filter: blur(10px);
 }
 
-button[type="submit"] {
-  padding: 5px 20px;
-  margin: 10px auto;
-  float: right;
+.ant-spin-dot-item {
+  background-color: #667eea;
 }
 
-#greeting {
-  margin: 10px auto;
-  padding: 10px 60px;
-  border: 1px solid #222;
+/* Supplier/Warehouse Info */
+.supplier-info,
+.warehouse-info {
+  animation: slideInFromLeft 0.5s ease-out;
 }
 
-#greeting:empty {
-  display: none;
+.supplier-name,
+.warehouse-name {
+  font-weight: 600;
+  font-size: 16px;
+  color: #333;
+  margin-bottom: 4px;
 }
 
-.browser-warning {
-  display: none;
+.supplier-company,
+.warehouse-company {
+  color: #666;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.warehouse-location {
+  color: #888;
+  font-size: 12px;
+}
+
+@keyframes slideInFromLeft {
+  from {
+    transform: translateX(-20px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Tags */
+.ant-tag {
+  border-radius: 12px;
+  font-weight: 500;
+  padding: 4px 12px;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+/* Progress Bar */
+.ant-progress-bg {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .page-header {
+    flex-direction: column;
+    gap: 16px;
+    text-align: center;
+  }
+
+  .page-header h1 {
+    font-size: 2rem;
+  }
+
+  .suppliers-container,
+  .warehouses-container,
+  .transporters-container,
+  .retailers-container,
+  .dashboard-container {
+    padding: 16px;
+  }
+}
+
+/* Floating Animation for Cards */
+@keyframes float {
+
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.stat-card:nth-child(1) {
+  animation: float 6s ease-in-out infinite;
+  animation-delay: 0s;
+}
+
+.stat-card:nth-child(2) {
+  animation: float 6s ease-in-out infinite;
+  animation-delay: 1.5s;
+}
+
+.stat-card:nth-child(3) {
+  animation: float 6s ease-in-out infinite;
+  animation-delay: 3s;
+}
+
+.stat-card:nth-child(4) {
+  animation: float 6s ease-in-out infinite;
+  animation-delay: 4.5s;
+}
+
+/* Glow Effect for Important Elements */
+.create-product-btn,
+.ant-btn-primary {
+  box-shadow: 0 0 20px rgba(102, 126, 234, 0.3);
+  animation: glow 2s ease-in-out infinite alternate;
+}
+
+@keyframes glow {
+  from {
+    box-shadow: 0 0 20px rgba(102, 126, 234, 0.3);
+  }
+
+  to {
+    box-shadow: 0 0 30px rgba(102, 126, 234, 0.6);
+  }
 }

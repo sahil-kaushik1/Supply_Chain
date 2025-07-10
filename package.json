@@ -14,5 +14,14 @@
   "type": "module",
   "workspaces": [
     "src/supply_chain_frontend"
-  ]
+  ],
+  "dependencies": {
+    "@ant-design/icons": "^6.0.0",
+    "@dfinity/auth-client": "^2.4.1",
+    "antd": "^5.26.4",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-router-dom": "^7.6.3",
+    "recharts": "^3.1.0"
+  }
 }

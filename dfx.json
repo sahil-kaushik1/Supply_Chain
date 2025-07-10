@@ -5,6 +5,21 @@
       "package": "supply_chain_backend",
       "type": "rust"
     },
+    "rating_backend": {
+      "candid": "src/rating_backend/rating_backend.did",
+      "package": "rating_backend",
+      "type": "rust"
+    },
+    "reporting_backend": {
+      "candid": "src/reporting_backend/reporting_backend.did",
+      "package": "reporting_backend",
+      "type": "rust"
+    },
+    "user_management_backend": {
+      "type": "rust",
+      "package": "user_management_backend",
+      "candid": "src/user_management_backend/user_management_backend.did"
+    },
     "supply_chain_frontend": {
       "dependencies": [
         "supply_chain_backend"
