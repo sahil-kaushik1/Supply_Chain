@@ -15,12 +15,21 @@
   "workspaces": [
     "src/supply_chain_frontend"
   ],
+  "@dfinity/agent": "^2.1.0",
+  "@dfinity/auth-client": "^2.1.0",
+  "@dfinity/candid": "^2.1.0",
+  "@dfinity/principal": "^2.1.0",
+  "@dfinity/identity": "^2.1.0",
+  "antd": "^5.0.0",
+  "react": "^18.0.0",
+  "react-dom": "^18.0.0",
+  "react-router-dom": "^6.0.0",
+  "recharts": "^2.8.0",
   "dependencies": {
     "@ant-design/icons": "^6.0.0",
+    "@dfinity/agent": "^2.4.1",
     "@dfinity/auth-client": "^2.4.1",
     "antd": "^5.26.4",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
     "react-router-dom": "^7.6.3",
     "recharts": "^3.1.0"
   }

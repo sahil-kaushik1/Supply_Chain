@@ -6,16 +6,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ICP Supply Chain Management</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/antd/5.15.0/reset.min.css">
-  <!-- FIXED CSP - Added http://127.0.0.1:* to connect-src -->
+  <!-- FIXED CSP - Added CDN support and proper IC hosts -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
     script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:;
-    style-src 'self' 'unsafe-inline';
+    style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com;
     img-src 'self' data: blob:;
-    font-src 'self' data:;
+    font-src 'self' data: https://fonts.gstatic.com https://cdnjs.cloudflare.com;
     connect-src 'self' http://localhost:* http://127.0.0.1:* https://icp0.io https://*.icp0.io https://icp-api.io wss://localhost:* wss://127.0.0.1:*;
     worker-src 'self' blob:;
   ">
+
   <style>
     body {
       margin: 0;
