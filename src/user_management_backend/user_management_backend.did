@@ -1,53 +1,56 @@
 type UserRole = variant {
-    Supplier;
-    Transporter;
-    Warehouse;
-    Retailer;
-    Admin;
+  Supplier;
+  Transporter;
+  Warehouse;
+  Retailer;
+  Admin;
 };
 
 type User = record {
-    id: principal;
-    name: text;
-    email: text;
-    role: UserRole;
-    company_name: text;
-    address: text;
-    phone: text;
-    is_verified: bool;
-    created_at: nat64;
-    updated_at: nat64;
-    metadata: vec record { text; text };
+  id: principal;
+  name: text;
+  email: text;
+  role: UserRole;
+  company_name: text;
+  address: text;
+  phone: text;
+  is_verified: bool;
+  created_at: nat64;
+  updated_at: nat64;
+  metadata: vec record { text; text };
 };
 
 type UserProfile = record {
-    user: User;
-    certifications: vec text;
-    compliance_documents: vec text;
-    business_license: opt text;
-    tax_id: opt text;
+  user: User;
+  certifications: vec text;
+  compliance_documents: vec text;
+  business_license: opt text;
+  tax_id: opt text;
 };
 
-type UserResult = variant {
-    Ok: User;
-    Err: text;
+type Result_User = variant {
+  Ok: User;
+  Err: text;
 };
 
-type ProfileResult = variant {
-    Ok: UserProfile;
-    Err: text;
+type Result_UserProfile = variant {
+  Ok: UserProfile;
+  Err: text;
 };
 
 service : {
-    register_user: (text, text, UserRole, text, text, text) -> (UserResult);
-    update_user_profile: (opt text, opt text, opt text, opt text, opt text) -> (UserResult);
-    verify_user: (principal) -> (UserResult);
-    add_certification: (text) -> (ProfileResult);
-    add_compliance_document: (text) -> (ProfileResult);
-    get_user: (principal) -> (UserResult) query;
-    get_user_profile: (principal) -> (ProfileResult) query;
-    get_current_user: () -> (UserResult) query;
-    get_users_by_role: (UserRole) -> (vec User) query;
-    get_all_users: () -> (vec User) query;
-    get_verified_users: () -> (vec User) query;
+  // Update methods
+  register_user: (text, text, UserRole, text, text, text) -> (Result_User);
+  update_user_profile: (opt text, opt text, opt text, opt text, opt text) -> (Result_User);
+  verify_user: (principal) -> (Result_User);
+  add_certification: (text) -> (Result_UserProfile);
+  add_compliance_document: (text) -> (Result_UserProfile);
+  
+  // Query methods
+  get_user: (principal) -> (Result_User) query;
+  get_user_profile: (principal) -> (Result_UserProfile) query;
+  get_current_user: () -> (Result_User) query;
+  get_users_by_role: (UserRole) -> (vec User) query;
+  get_all_users: () -> (vec User) query;
+  get_verified_users: () -> (vec User) query;
 }

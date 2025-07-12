@@ -42,6 +42,8 @@ export class AuthService {
         this.isLocalDevelopment = null;
         this.connectionPromise = null;
         this.plugAgent = null;
+        this.rootKeyFetched = false;
+        this.isRefreshing = false;
     }
 
     static getInstance() {
@@ -51,7 +53,7 @@ export class AuthService {
         return AuthService.instance;
     }
 
-    // CRITICAL FIX: Enhanced environment detection
+    // Enhanced environment detection
     getEnvironment() {
         if (this.isLocalDevelopment !== null) {
             return this.isLocalDevelopment;
@@ -70,16 +72,15 @@ export class AuthService {
         return isLocal;
     }
 
-    // CRITICAL FIX: Always use correct port
+    // Get correct host - FIXED: Always use 4943 for local development
     getHost() {
         if (!this.getEnvironment()) {
             return 'https://icp-api.io';
         }
-        // FIXED: Only use port 4943, never 5000
-        return this.workingHost || 'http://localhost:4943';
+        return 'http://localhost:4943'; // FIXED: Always use 4943, never 5000
     }
 
-    // CRITICAL FIX: Enhanced connection testing
+    // Enhanced connection testing - FIXED: Only test 4943
     async testConnection() {
         if (this.connectionTested && this.workingHost) {
             return this.workingHost;
@@ -99,11 +100,9 @@ export class AuthService {
     }
 
     async _performConnectionTest() {
-        // FIXED: Only test port 4943
         const hostsToTest = [
-            'http://localhost:4943',
-            'http://127.0.0.1:4943',
-            'http://0.0.0.0:4943'
+            'http://localhost:4943', // FIXED: Only test 4943
+            'http://127.0.0.1:4943'
         ];
 
         for (const host of hostsToTest) {
@@ -131,30 +130,17 @@ export class AuthService {
             }
         }
 
-        if (this.getEnvironment()) {
-            console.warn('⚠️ No local IC replica found, using default localhost:4943');
-            this.workingHost = 'http://localhost:4943';
-            this.connectionTested = true;
-            return this.workingHost;
-        }
-
-        throw new Error('No working host found');
+        console.warn('⚠️ No local IC replica found, using default localhost:4943');
+        this.workingHost = 'http://localhost:4943';
+        this.connectionTested = true;
+        return this.workingHost;
     }
 
-    // CRITICAL FIX: Agent creation without fetchRootKey issues
+    // FIXED: Proper agent creation with correct root key handling
     async createAgentForII() {
         try {
             const isLocal = this.getEnvironment();
-            let host = this.getHost();
-
-            if (isLocal) {
-                try {
-                    const workingHost = await this.testConnection();
-                    host = workingHost;
-                } catch (error) {
-                    console.warn('Connection test failed, using default host:', error.message);
-                }
-            }
+            const host = this.getHost(); // Always returns localhost:4943 for local
 
             console.log(`🔌 Creating agent with host: ${host}`);
 
@@ -164,20 +150,23 @@ export class AuthService {
                 fetchOptions: { credentials: 'omit' },
             };
 
+            // FIXED: Proper local development configuration
             if (isLocal) {
-                agentOptions.shouldFetchRootKey = true;
+                agentOptions.shouldFetchRootKey = false; // We'll fetch manually
                 agentOptions.verifyQuerySignatures = false;
             }
 
             this.agent = await HttpAgent.create(agentOptions);
 
-            // FIXED: Only fetch root key for our own agents
-            if (isLocal && this.agent && typeof this.agent.fetchRootKey === 'function') {
+            // FIXED: Enhanced root key fetching for local development
+            if (isLocal && this.agent && typeof this.agent.fetchRootKey === 'function' && !this.rootKeyFetched) {
                 try {
                     await this.agent.fetchRootKey();
+                    this.rootKeyFetched = true;
                     console.log('✅ Root key fetched successfully');
                 } catch (error) {
                     console.warn('⚠️ Root key fetch failed, continuing anyway:', error.message);
+                    // Don't throw - continue anyway
                 }
             }
 
@@ -190,16 +179,11 @@ export class AuthService {
         }
     }
 
-    // CRITICAL FIX: Plug wallet setup WITHOUT fetchRootKey calls
+    // FIXED: Plug wallet setup with correct host configuration
     async setupPlugWallet() {
         try {
             const isLocal = this.getEnvironment();
-            let host = this.getHost();
-
-            if (isLocal) {
-                const workingHost = await this.testConnection();
-                host = workingHost;
-            }
+            const host = this.getHost(); // Always localhost:4943 for local
 
             console.log(`🔌 Setting up Plug wallet with host: ${host}`);
 
@@ -210,12 +194,18 @@ export class AuthService {
                 reportingCanisterId,
             ];
 
+            // FIXED: Correct Plug configuration for local development
             const plugConfig = {
                 whitelist: whitelist,
-                host: host,
+                host: host, // FIXED: Always use localhost:4943
                 timeout: 60000,
-                ...(isLocal && { dev: true, providerUrl: host })
             };
+
+            // FIXED: Local development specific configuration
+            if (isLocal) {
+                plugConfig.dev = true;
+                plugConfig.providerUrl = host; // FIXED: Explicitly set provider URL
+            }
 
             const connected = await window.ic.plug.isConnected();
             if (!connected) {
@@ -225,11 +215,16 @@ export class AuthService {
                 }
             }
 
+            // FIXED: Enhanced agent creation
             if (!window.ic.plug.agent) {
                 await window.ic.plug.createAgent(plugConfig);
             }
 
-            // CRITICAL FIX: DO NOT call fetchRootKey on Plug agent
+            // Verify agent was created
+            if (!window.ic.plug.agent) {
+                throw new Error('Failed to create Plug agent');
+            }
+
             this.plugAgent = window.ic.plug.agent;
             this.agent = window.ic.plug.agent;
             this.identity = window.ic.plug.agent.identity;
@@ -261,6 +256,7 @@ export class AuthService {
                     return true;
                 } catch (plugError) {
                     console.warn('⚠️ Plug wallet login failed:', plugError.message);
+                    // Don't throw error, fall back to Internet Identity
                 }
             }
 
@@ -284,7 +280,6 @@ export class AuthService {
             return new Promise((resolve, reject) => {
                 const isLocal = this.getEnvironment();
                 const host = this.getHost();
-
                 const identityProvider = isLocal
                     ? `${host}?canisterId=${process.env.INTERNET_IDENTITY_CANISTER_ID || 'rdmx6-jaaaa-aaaaa-aaadq-cai'}`
                     : 'https://identity.ic0.app';
@@ -352,6 +347,8 @@ export class AuthService {
             this.workingHost = null;
             this.retryCount = 0;
             this.connectionPromise = null;
+            this.rootKeyFetched = false;
+
             console.log('✅ Logout successful');
         } catch (error) {
             console.error('❌ Logout failed:', error);
@@ -392,7 +389,7 @@ export class AuthService {
         }
     }
 
-    // CRITICAL FIX: Enhanced actor creation
+    // FIXED: Enhanced actor creation with proper error handling
     async createActorSafely(canisterId, createActorFunction, idlFactory) {
         if (!this.agent || !this.isInitialized) {
             throw new Error('Not authenticated or agent not initialized');
@@ -418,46 +415,78 @@ export class AuthService {
             return actor;
         } catch (error) {
             console.error('❌ Failed to create actor:', error);
-
             if (error.message.includes('certificate') && this.retryCount < this.maxRetries) {
                 console.log(`🔄 Retrying actor creation (${this.retryCount + 1}/${this.maxRetries})`);
                 this.retryCount++;
                 await new Promise(resolve => setTimeout(resolve, 1000 * this.retryCount));
 
+                // Reset and recreate agent
+                this.clearActors();
                 if (!this.isPlugConnected) {
                     await this.createAgentForII();
+                } else {
+                    await this.setupPlugWallet();
                 }
-
                 return this.createActorSafely(canisterId, createActorFunction, idlFactory);
             }
-
             throw error;
         }
     }
 
-    // CRITICAL FIX: Safe canister calling with proper error handling
+    // FIXED: Enhanced canister calling with proper certificate error handling
     async callCanisterSafely(actorPromise, methodName, ...args) {
-        try {
-            const actor = await actorPromise;
-            const result = await actor[methodName](...args);
-            return result;
-        } catch (error) {
-            console.error(`❌ Failed to call ${methodName}:`, error);
-
-            if (error.message.includes('certificate') || error.message.includes('Certificate')) {
-                console.log('🔄 Attempting to refresh actor due to certificate error');
-                this.clearActors();
-                await this.createAgentForII();
-
-                const actor = await actorPromise;
-                return await actor[methodName](...args);
-            }
-
-            throw error;
+        if (this.isRefreshing) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            return this.callCanisterSafely(actorPromise, methodName, ...args);
         }
+
+        const maxRetries = 3;
+        let lastError;
+
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+            try {
+                const actor = await actorPromise;
+                const result = await actor[methodName](...args);
+                return result;
+            } catch (error) {
+                console.error(`❌ Failed to call ${methodName} (attempt ${attempt + 1}):`, error);
+                lastError = error;
+
+                if (error.message.includes('certificate') || error.message.includes('Certificate')) {
+                    console.log('🔄 Certificate error detected, refreshing actor...');
+
+                    if (!this.isRefreshing) {
+                        this.isRefreshing = true;
+
+                        try {
+                            this.clearActors();
+
+                            if (!this.isPlugConnected) {
+                                await this.createAgentForII();
+                            } else {
+                                await this.setupPlugWallet();
+                            }
+                        } finally {
+                            this.isRefreshing = false;
+                        }
+                    }
+
+                    // Wait before retry
+                    if (attempt < maxRetries - 1) {
+                        await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+                        continue;
+                    }
+                }
+
+                // If not a certificate error or max retries reached, break
+                break;
+            }
+        }
+
+        throw lastError;
     }
 
-    // CRITICAL FIX: Proper enum serialization for Candid
+    // Proper enum serialization for Candid
     serializeEnumForCandid(enumValue) {
         if (typeof enumValue === 'string') {
             return { [enumValue]: null };
@@ -468,7 +497,7 @@ export class AuthService {
         throw new Error(`Invalid enum value: ${enumValue}`);
     }
 
-    // CRITICAL FIX: Proper enum deserialization from Candid
+    // Proper enum deserialization from Candid
     deserializeEnumFromCandid(candidEnum) {
         if (typeof candidEnum === 'object' && candidEnum !== null) {
             const keys = Object.keys(candidEnum);
@@ -628,7 +657,8 @@ export class AuthService {
                 initialized: this.isInitialized,
                 plugConnected: this.isPlugConnected,
                 host: this.getHost(),
-                environment: this.getEnvironment() ? 'local' : 'production'
+                environment: this.getEnvironment() ? 'local' : 'production',
+                rootKeyFetched: this.rootKeyFetched
             };
         } catch (error) {
             console.error('Health check failed:', error);
@@ -639,7 +669,8 @@ export class AuthService {
                 plugConnected: false,
                 host: this.getHost(),
                 environment: this.getEnvironment() ? 'local' : 'production',
-                error: error.message
+                error: error.message,
+                rootKeyFetched: false
             };
         }
     }

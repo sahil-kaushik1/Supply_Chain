@@ -40,7 +40,7 @@ import AuthService from './services/AuthService';
 const { Header, Sider, Content } = Layout;
 const { Title, Text } = Typography;
 
-// CRITICAL FIX: Error Boundary Component
+// Error Boundary Component
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -62,10 +62,10 @@ class ErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div style={{ padding: 20 }}>
+        <div style={{ padding: '20px' }}>
           <Alert
             message="Application Error"
-            description="Something went wrong. Please refresh the page."
+            description="Something went wrong. Please refresh the page or check the console for details."
             type="error"
             showIcon
             action={
@@ -74,15 +74,31 @@ class ErrorBoundary extends React.Component {
               </Button>
             }
           />
-          {process.env.NODE_ENV === 'development' && (
-            <details style={{ marginTop: 20 }}>
-              <summary>Error Details (Development Only)</summary>
-              <pre style={{ whiteSpace: 'pre-wrap' }}>
+          {this.state.error && (
+            <Card style={{ marginTop: '20px' }}>
+              <Typography.Paragraph>
+                <strong>Error Details:</strong><br />
                 {this.state.error && this.state.error.toString()}
+                <br />
                 {this.state.errorInfo.componentStack}
-              </pre>
-            </details>
+              </Typography.Paragraph>
+            </Card>
           )}
+          <Alert
+            style={{ marginTop: '20px' }}
+            message="Development Setup Required"
+            description={
+              <div>
+                <p>Make sure your local IC development environment is running:</p>
+                <pre style={{ background: '#f5f5f5', padding: '10px', borderRadius: '4px' }}>
+                  {`dfx start\ndfx deploy\ndfx generate\nnpm start`}
+                </pre>
+                <p>And that your application is connecting to: <code>http://localhost:4943</code></p>
+              </div>
+            }
+            type="info"
+            showIcon
+          />
         </div>
       );
     }
@@ -93,176 +109,109 @@ class ErrorBoundary extends React.Component {
 
 const App = () => {
   const [collapsed, setCollapsed] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [authenticated, setAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
-  const [authError, setAuthError] = useState(null);
-  const [retryCount, setRetryCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [authLoading, setAuthLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [healthStatus, setHealthStatus] = useState(null);
-  const [connectionStatus, setConnectionStatus] = useState('checking');
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Enhanced authentication check with health monitoring
   const checkAuthStatus = useCallback(async () => {
     try {
       setLoading(true);
-      setAuthError(null);
+      setError(null);
 
+      // Check health status
       const health = await AuthService.healthCheck();
       setHealthStatus(health);
 
-      console.log('🔍 Health check result:', health);
-
-      if (health.error) {
-        setAuthError(`System Error: ${health.error}`);
-        setAuthenticated(false);
-        return;
-      }
-
       if (!health.connectionOk) {
-        setConnectionStatus('disconnected');
-        setAuthError('Cannot connect to IC network. Please ensure DFX is running on port 4943.');
-        setAuthenticated(false);
+        setError('Cannot connect to IC network. Please ensure DFX is running.');
+        setIsAuthenticated(false);
         return;
       }
 
-      setConnectionStatus('connected');
-      setAuthenticated(health.authenticated);
+      const isAuth = await AuthService.isAuthenticated();
+      setIsAuthenticated(isAuth);
 
-      if (health.authenticated) {
-        try {
-          const result = await AuthService.getCurrentUser();
-          if (result && 'Ok' in result) {
-            // FIXED: Properly handle user data with enum deserialization
-            const user = result.Ok;
-            setCurrentUser(user);
-            if (location.pathname === '/') {
-              navigate('/dashboard');
-            }
-          } else {
-            setCurrentUser(null);
-            if (location.pathname !== '/register') {
-              navigate('/register');
-            }
-          }
-        } catch (userError) {
-          console.warn('Failed to get current user:', userError);
-          setCurrentUser(null);
-        }
-      }
-
-      setRetryCount(0);
-    } catch (error) {
-      console.error('Auth check failed:', error);
-
-      let errorMessage = 'Authentication check failed.';
-
-      if (error.message.includes('certificate') || error.message.includes('Certificate')) {
-        errorMessage = 'Certificate verification failed. Please ensure DFX is running with "dfx start".';
-      } else if (error.message.includes('fetchRootKey') || error.message.includes('root key')) {
-        errorMessage = 'Certificate error: Please ensure DFX is running correctly.';
-      } else if (error.message.includes('Connection refused') || error.message.includes('fetch')) {
-        errorMessage = 'Connection error: Please ensure DFX is running on port 4943.';
-      } else if (error.message.includes('Agent') || error.message.includes('agent')) {
-        errorMessage = 'Agent error: Please refresh the page and try again.';
-      }
-
-      setAuthError(errorMessage);
-      setAuthenticated(false);
-      setConnectionStatus('error');
-
-      if (retryCount < 3) {
-        const delay = Math.pow(2, retryCount) * 2000;
-        setTimeout(() => {
-          setRetryCount(prev => prev + 1);
-          checkAuthStatus();
-        }, delay);
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [retryCount, navigate, location.pathname]);
-
-  const handleLogin = useCallback(async () => {
-    try {
-      setLoading(true);
-      setAuthError(null);
-
-      const health = await AuthService.healthCheck();
-      if (!health.connectionOk) {
-        setAuthError('Cannot connect to IC network. Please ensure DFX is running.');
-        setLoading(false);
-        return;
-      }
-
-      const success = await AuthService.login();
-      if (success) {
-        setAuthenticated(true);
-
-        const result = await AuthService.getCurrentUser();
-        if (result && 'Ok' in result) {
-          const user = result.Ok;
-          setCurrentUser(user);
-          message.success('Login successful!');
-          navigate('/dashboard');
+      if (isAuth) {
+        const userResult = await AuthService.getCurrentUser();
+        if (userResult && 'Ok' in userResult) {
+          setCurrentUser(userResult.Ok);
         } else {
           setCurrentUser(null);
-          message.info('Please complete your registration');
-          navigate('/register');
         }
       } else {
-        setAuthError('Login failed. Please try again.');
+        setCurrentUser(null);
       }
     } catch (error) {
-      console.error('Login error:', error);
-
-      let errorMessage = 'Login failed. Please try again.';
-
-      if (error.message.includes('certificate') || error.message.includes('Certificate')) {
-        errorMessage = 'Certificate verification failed. Please ensure DFX is running.';
-      } else if (error.message.includes('fetchRootKey') || error.message.includes('root key')) {
-        errorMessage = 'Certificate error: Please restart DFX with "dfx start --clean".';
-      } else if (error.message.includes('Agent') || error.message.includes('agent')) {
-        errorMessage = 'Agent configuration error: Please refresh the page and try again.';
-      } else if (error.message.includes('rejected') || error.message.includes('User')) {
-        errorMessage = 'Login was cancelled by user.';
-      } else if (error.message.includes('fetch') || error.message.includes('network')) {
-        errorMessage = 'Network error: Please check your connection and try again.';
-      }
-
-      setAuthError(errorMessage);
+      console.error('Auth check failed:', error);
+      setError(`Authentication check failed: ${error.message}`);
+      setIsAuthenticated(false);
+      setCurrentUser(null);
     } finally {
       setLoading(false);
     }
-  }, [navigate]);
+  }, []);
 
-  const handleLogout = useCallback(async () => {
+  const handleLogin = async () => {
     try {
-      await AuthService.logout();
-      setAuthenticated(false);
-      setCurrentUser(null);
-      setAuthError(null);
-      setRetryCount(0);
-      setConnectionStatus('checking');
-      setHealthStatus(null);
-      message.success('Logged out successfully');
-      navigate('/');
-    } catch (error) {
-      console.error('Logout error:', error);
-      message.error('Logout failed');
-    }
-  }, [navigate]);
+      setAuthLoading(true);
+      setError(null);
 
-  const handleRetry = useCallback(() => {
-    setRetryCount(0);
+      await AuthService.login();
+      await checkAuthStatus();
+
+      if (location.pathname === '/') {
+        navigate('/dashboard');
+      }
+
+      message.success('Login successful!');
+    } catch (error) {
+      console.error('Login failed:', error);
+      setError(`Login failed: ${error.message}`);
+      message.error('Login failed. Please try again.');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      setAuthLoading(true);
+      await AuthService.logout();
+      setIsAuthenticated(false);
+      setCurrentUser(null);
+      navigate('/');
+      message.success('Logged out successfully');
+    } catch (error) {
+      console.error('Logout failed:', error);
+      message.error('Logout failed');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleRegister = () => {
+    navigate('/register');
+  };
+
+  const handleRetry = () => {
+    setError(null);
     checkAuthStatus();
-  }, [checkAuthStatus]);
+  };
 
   useEffect(() => {
     checkAuthStatus();
+
+    // Set up periodic health checks
+    const interval = setInterval(checkAuthStatus, 30000);
+    return () => clearInterval(interval);
   }, [checkAuthStatus]);
 
+  // Menu items for authenticated users (simplified - all access)
   const menuItems = [
     {
       key: '/dashboard',
@@ -302,125 +251,176 @@ const App = () => {
     {
       key: '/tasks',
       icon: <CalendarOutlined />,
-      label: 'Tasks',
+      label: 'Task Management',
     },
   ];
 
-  const userMenuItems = [
-    {
-      key: 'profile',
-      icon: <UserOutlined />,
-      label: 'Profile',
-    },
-    {
-      key: 'settings',
-      icon: <SettingOutlined />,
-      label: 'Settings',
-    },
-    {
-      type: 'divider',
-    },
-    {
-      key: 'logout',
-      icon: <LogoutOutlined />,
-      label: 'Logout',
-      onClick: handleLogout,
-    },
-  ];
+  const userMenu = (
+    <Menu>
+      <Menu.Item key="profile" icon={<UserOutlined />}>
+        Profile
+      </Menu.Item>
+      <Menu.Item key="settings" icon={<SettingOutlined />}>
+        Settings
+      </Menu.Item>
+      <Menu.Divider />
+      <Menu.Item key="logout" icon={<LogoutOutlined />} onClick={handleLogout}>
+        Logout
+      </Menu.Item>
+    </Menu>
+  );
 
-  const getConnectionStatusColor = () => {
-    switch (connectionStatus) {
-      case 'connected': return 'green';
-      case 'disconnected': return 'red';
-      case 'error': return 'red';
-      default: return 'orange';
-    }
-  };
-
-  const getConnectionStatusText = () => {
-    switch (connectionStatus) {
-      case 'connected': return 'Connected';
-      case 'disconnected': return 'Disconnected';
-      case 'error': return 'Error';
-      default: return 'Checking...';
-    }
-  };
-
+  // Loading screen
   if (loading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+      <div style={{
+        height: '100vh',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        flexDirection: 'column'
+      }}>
         <Spin size="large" />
-        <span style={{ marginLeft: 16 }}>Loading...</span>
+        <Typography.Text style={{ marginTop: 16 }}>
+          Initializing Supply Chain Management System...
+        </Typography.Text>
+        {healthStatus && (
+          <Typography.Text type="secondary" style={{ marginTop: 8 }}>
+            Environment: {healthStatus.environment} | Host: {healthStatus.host}
+          </Typography.Text>
+        )}
       </div>
     );
   }
 
-  if (authError) {
+  // Error screen
+  if (error) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', padding: 20 }}>
-        <Card style={{ maxWidth: 800, width: '100%' }}>
-          <Alert
-            message="Connection Error"
-            description={authError}
-            type="error"
-            showIcon
-            action={
-              <Space>
-                <Button onClick={handleRetry} type="primary">
-                  Retry
-                </Button>
-                <Button onClick={handleLogin}>
-                  Login
-                </Button>
-              </Space>
-            }
-          />
+      <div style={{ padding: '20px' }}>
+        <Alert
+          message="Connection Error"
+          description={error}
+          type="error"
+          showIcon
+          action={
+            <Space>
+              <Button icon={<ReloadOutlined />} onClick={handleRetry}>
+                Retry
+              </Button>
+              <Button type="primary" onClick={() => window.location.reload()}>
+                Refresh Page
+              </Button>
+            </Space>
+          }
+        />
+
+        {healthStatus && (
+          <Card style={{ marginTop: '20px' }}>
+            <Typography.Title level={4}>System Status</Typography.Title>
+            <Space direction="vertical" style={{ width: '100%' }}>
+              <div>
+                <Badge
+                  status={healthStatus.connectionOk ? "success" : "error"}
+                  text={`Connection: ${healthStatus.connectionOk ? 'OK' : 'Failed'}`}
+                />
+              </div>
+              <div>
+                <Badge
+                  status={healthStatus.authenticated ? "success" : "warning"}
+                  text={`Authentication: ${healthStatus.authenticated ? 'Authenticated' : 'Not Authenticated'}`}
+                />
+              </div>
+              <div>
+                <Badge
+                  status={healthStatus.initialized ? "success" : "error"}
+                  text={`Initialization: ${healthStatus.initialized ? 'Ready' : 'Failed'}`}
+                />
+              </div>
+              <Typography.Text type="secondary">
+                Environment: {healthStatus.environment} | Host: {healthStatus.host}
+              </Typography.Text>
+            </Space>
+          </Card>
+        )}
+
+        <Alert
+          style={{ marginTop: '20px' }}
+          message="Development Setup Instructions"
+          description={
+            <div>
+              <p>Make sure your local IC development environment is running:</p>
+              <pre style={{ background: '#f5f5f5', padding: '10px', borderRadius: '4px' }}>
+                {`dfx start\ndfx deploy\ndfx generate\nnpm start`}
+              </pre>
+            </div>
+          }
+          type="info"
+          showIcon
+        />
+      </div>
+    );
+  }
+
+  // Login screen
+  if (!isAuthenticated) {
+    return (
+      <div style={{
+        height: '100vh',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+      }}>
+        <Card style={{ width: 400, textAlign: 'center' }}>
+          <div style={{ marginBottom: '24px' }}>
+            <ApiOutlined style={{ fontSize: '48px', color: '#1890ff' }} />
+            <Title level={2} style={{ marginTop: '16px' }}>
+              Supply Chain Management
+            </Title>
+            <Text type="secondary">
+              Blockchain-powered supply chain tracking
+            </Text>
+          </div>
 
           {healthStatus && (
-            <div style={{ marginTop: 20 }}>
-              <Title level={4}>System Status</Title>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
-                <Card size="small">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    {healthStatus.authenticated ? <CheckCircleOutlined style={{ color: 'green' }} /> : <CloseCircleOutlined style={{ color: 'red' }} />}
-                    <span>Authentication: {healthStatus.authenticated ? 'OK' : 'Failed'}</span>
-                  </div>
-                </Card>
-                <Card size="small">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    {healthStatus.connectionOk ? <CheckCircleOutlined style={{ color: 'green' }} /> : <CloseCircleOutlined style={{ color: 'red' }} />}
-                    <span>Connection: {healthStatus.connectionOk ? 'OK' : 'Failed'}</span>
-                  </div>
-                </Card>
-                <Card size="small">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <ApiOutlined />
-                    <span>Environment: {healthStatus.environment}</span>
-                  </div>
-                </Card>
-                <Card size="small">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <ExclamationCircleOutlined />
-                    <span>Host: {healthStatus.host}</span>
-                  </div>
-                </Card>
-              </div>
+            <div style={{ marginBottom: '24px' }}>
+              <Space direction="vertical" style={{ width: '100%' }}>
+                <Badge
+                  status={healthStatus.connectionOk ? "success" : "error"}
+                  text={`IC Network: ${healthStatus.connectionOk ? 'Connected' : 'Disconnected'}`}
+                />
+                <Text type="secondary" style={{ fontSize: '12px' }}>
+                  {healthStatus.environment} mode - {healthStatus.host}
+                </Text>
+              </Space>
             </div>
           )}
 
-          <div style={{ marginTop: 20 }}>
-            <Title level={4}>Local Development Setup</Title>
-            <Text>
-              Please ensure your local IC development environment is running:
-            </Text>
-            <pre style={{ backgroundColor: '#f5f5f5', padding: 10, marginTop: 10, borderRadius: 4 }}>
-              dfx start{'\n'}
-              dfx deploy{'\n'}
-              dfx generate{'\n'}
-              npm start
-            </pre>
-            <Text>
-              The application should connect to: <code>http://localhost:4943</code>
+          <Space direction="vertical" style={{ width: '100%' }}>
+            <Button
+              type="primary"
+              size="large"
+              style={{ width: '100%' }}
+              loading={authLoading}
+              onClick={handleLogin}
+              icon={<WalletOutlined />}
+            >
+              Connect Wallet & Login
+            </Button>
+
+            <Button
+              size="large"
+              style={{ width: '100%' }}
+              onClick={handleRegister}
+              icon={<UserOutlined />}
+            >
+              Register New User
+            </Button>
+          </Space>
+
+          <div style={{ marginTop: '24px' }}>
+            <Text type="secondary" style={{ fontSize: '12px' }}>
+              Supports Internet Identity and Plug Wallet
             </Text>
           </div>
         </Card>
@@ -428,43 +428,7 @@ const App = () => {
     );
   }
 
-  if (!authenticated) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        <Card style={{ maxWidth: 400, width: '100%' }}>
-          <div style={{ textAlign: 'center' }}>
-            <Title level={2}>Supply Chain Management</Title>
-            <Text>Please connect your wallet to continue</Text>
-            <div style={{ marginTop: 20 }}>
-              <Button
-                type="primary"
-                size="large"
-                icon={<WalletOutlined />}
-                onClick={handleLogin}
-                loading={loading}
-              >
-                Connect Wallet
-              </Button>
-            </div>
-            {healthStatus && (
-              <div style={{ marginTop: 20, textAlign: 'left' }}>
-                <Title level={5}>System Status</Title>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>Connection:</span>
-                  <Badge status={getConnectionStatusColor()} text={getConnectionStatusText()} />
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>Environment:</span>
-                  <span>{healthStatus.environment}</span>
-                </div>
-              </div>
-            )}
-          </div>
-        </Card>
-      </div>
-    );
-  }
-
+  // Main application
   return (
     <ErrorBoundary>
       <Layout style={{ minHeight: '100vh' }}>
@@ -476,11 +440,21 @@ const App = () => {
             background: '#001529',
           }}
         >
-          <div style={{ padding: 16, textAlign: 'center' }}>
-            <Title level={4} style={{ color: 'white', margin: 0 }}>
-              {collapsed ? 'SCM' : 'Supply Chain'}
-            </Title>
+          <div style={{
+            height: '32px',
+            margin: '16px',
+            background: 'rgba(255, 255, 255, 0.2)',
+            borderRadius: '4px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'white',
+            fontSize: collapsed ? '14px' : '16px',
+            fontWeight: 'bold'
+          }}>
+            {collapsed ? 'SCM' : 'Supply Chain'}
           </div>
+
           <Menu
             theme="dark"
             mode="inline"
@@ -489,65 +463,70 @@ const App = () => {
             onClick={({ key }) => navigate(key)}
           />
         </Sider>
+
         <Layout>
-          <Header style={{ background: '#fff', padding: '0 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Header style={{
+            padding: '0 16px',
+            background: '#fff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+          }}>
             <div style={{ display: 'flex', alignItems: 'center' }}>
               <Button
                 type="text"
                 icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
                 onClick={() => setCollapsed(!collapsed)}
-                style={{
-                  fontSize: '16px',
-                  width: 64,
-                  height: 64,
-                }}
+                style={{ fontSize: '16px', width: 64, height: 64 }}
               />
-              <Badge
-                status={getConnectionStatusColor()}
-                text={getConnectionStatusText()}
-                style={{ marginLeft: 16 }}
-              />
-            </div>
-            <Space>
-              <Button
-                icon={<ReloadOutlined />}
-                onClick={handleRetry}
-                title="Refresh Connection"
-              />
-              {currentUser && (
-                <Dropdown
-                  menu={{
-                    items: userMenuItems,
-                  }}
-                  placement="bottomRight"
-                >
-                  <Space style={{ cursor: 'pointer' }}>
-                    <Avatar icon={<UserOutlined />} />
-                    <span>{currentUser.name}</span>
-                    <Badge
-                      status={currentUser.is_verified ? 'success' : 'warning'}
-                      text={currentUser.is_verified ? 'Verified' : 'Unverified'}
-                    />
-                  </Space>
-                </Dropdown>
+
+              {healthStatus && !healthStatus.connectionOk && (
+                <Alert
+                  message="Connection Issue"
+                  type="warning"
+                  showIcon
+                  style={{ marginLeft: '16px' }}
+                />
               )}
+            </div>
+
+            <Space>
+              {healthStatus && (
+                <Badge
+                  status={healthStatus.connectionOk ? "success" : "error"}
+                  text={healthStatus.environment}
+                />
+              )}
+
+              <Dropdown overlay={userMenu} placement="bottomRight">
+                <Space style={{ cursor: 'pointer' }}>
+                  <Avatar icon={<UserOutlined />} />
+                  <span>
+                    {currentUser ? currentUser.name : 'User'} (Admin)
+                  </span>
+                </Space>
+              </Dropdown>
             </Space>
           </Header>
-          <Content style={{ margin: '16px', padding: 24, background: '#fff', minHeight: 280 }}>
-            <ErrorBoundary>
-              <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/suppliers" element={<Suppliers />} />
-                <Route path="/transporters" element={<Transporters />} />
-                <Route path="/warehouses" element={<Warehouses />} />
-                <Route path="/retailers" element={<Retailers />} />
-                <Route path="/ratings" element={<Ratings />} />
-                <Route path="/reports" element={<Reports />} />
-                <Route path="/tasks" element={<TaskManagement />} />
-                <Route path="/register" element={<UserRegistration />} />
-              </Routes>
-            </ErrorBoundary>
+
+          <Content style={{
+            margin: '16px',
+            background: '#f0f2f5',
+            minHeight: 'calc(100vh - 112px)'
+          }}>
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/suppliers" element={<Suppliers />} />
+              <Route path="/transporters" element={<Transporters />} />
+              <Route path="/warehouses" element={<Warehouses />} />
+              <Route path="/retailers" element={<Retailers />} />
+              <Route path="/ratings" element={<Ratings />} />
+              <Route path="/reports" element={<Reports />} />
+              <Route path="/tasks" element={<TaskManagement />} />
+              <Route path="/register" element={<UserRegistration />} />
+            </Routes>
           </Content>
         </Layout>
       </Layout>

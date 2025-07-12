@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Card, Row, Col, Statistic, Table, Tag, Timeline, Spin, message, Button, Modal, Form, Input, Select, Space, Alert, Tooltip } from 'antd';
+import { Card, Row, Col, Statistic, Table, Tag, Timeline, Spin, message, Button, Modal, Form, Input, Select, Space, Alert, Tooltip, Descriptions } from 'antd';
 import {
     ShoppingCartOutlined,
     TruckOutlined,
@@ -11,6 +11,8 @@ import {
     ExclamationCircleOutlined,
     CheckCircleOutlined,
     ClockCircleOutlined,
+    ArrowRightOutlined,
+    EditOutlined,
 } from '@ant-design/icons';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
 import AuthService from '../services/AuthService';
@@ -30,9 +32,15 @@ const Dashboard = () => {
     const [currentUser, setCurrentUser] = useState(null);
     const [error, setError] = useState(null);
     const [modalVisible, setModalVisible] = useState(false);
+    const [statusModalVisible, setStatusModalVisible] = useState(false);
+    const [transferModalVisible, setTransferModalVisible] = useState(false);
+    const [selectedProduct, setSelectedProduct] = useState(null);
+    const [availableUsers, setAvailableUsers] = useState([]);
     const [healthStatus, setHealthStatus] = useState(null);
     const [retryCount, setRetryCount] = useState(0);
     const [form] = Form.useForm();
+    const [statusForm] = Form.useForm();
+    const [transferForm] = Form.useForm();
 
     const loadDashboardData = useCallback(async () => {
         try {
@@ -69,12 +77,12 @@ const Dashboard = () => {
 
             if (results[1].status === 'fulfilled') {
                 const usersData = results[1].value;
-                // FIXED: Properly deserialize enum data
                 const processedUsers = Array.isArray(usersData) ? usersData.map(user => ({
                     ...user,
                     role: AuthService.deserializeEnumFromCandid(user.role)
                 })) : [];
                 setUsers(processedUsers);
+                setAvailableUsers(processedUsers);
             } else {
                 console.warn('Failed to load users:', results[1].reason);
                 setUsers([]);
@@ -111,7 +119,6 @@ const Dashboard = () => {
                 'get_all_products'
             );
 
-            // FIXED: Properly handle product status enums
             const processedProducts = Array.isArray(result) ? result.map(product => ({
                 ...product,
                 status: AuthService.deserializeEnumFromCandid(product.status)
@@ -145,6 +152,7 @@ const Dashboard = () => {
                 Promise.resolve(actor),
                 'get_statistics'
             );
+
             return {
                 totalProducts: Number(result[0]) || 0,
                 totalEvents: Number(result[1]) || 0,
@@ -173,6 +181,7 @@ const Dashboard = () => {
                         'get_product_tracking_history',
                         productList[i].id
                     );
+
                     if (Array.isArray(productEvents)) {
                         events.push(...productEvents);
                     }
@@ -207,10 +216,33 @@ const Dashboard = () => {
         }
     }, []);
 
+    // Simplified - all users have full access (Admin powers)
+    const canUserPerformAction = (action) => {
+        return currentUser !== null; // All authenticated users can perform all actions
+    };
+
+    // Get available status transitions (simplified - all transitions available)
+    const getAvailableStatusTransitions = (product) => {
+        if (!currentUser || !product) return [];
+
+        const transitions = [
+            { value: 'InTransit', label: 'Mark as In Transit' },
+            { value: 'InWarehouse', label: 'Mark as In Warehouse' },
+            { value: 'Delivered', label: 'Mark as Delivered' },
+            { value: 'Sold', label: 'Mark as Sold' }
+        ];
+
+        return transitions;
+    };
+
+    // Get users filtered by role for transfers
+    const getUsersByRole = (role) => {
+        return availableUsers.filter(user => user.role === role);
+    };
+
     const handleQuickCreateProduct = async (values) => {
         try {
             const actor = await AuthService.getSupplyChainActor();
-
             await AuthService.callCanisterSafely(
                 Promise.resolve(actor),
                 'create_product',
@@ -232,6 +264,55 @@ const Dashboard = () => {
         } catch (error) {
             console.error('Failed to create product:', error);
             message.error(`Failed to create product: ${error.message}`);
+        }
+    };
+
+    const handleUpdateProductStatus = async (values) => {
+        try {
+            const actor = await AuthService.getSupplyChainActor();
+            const statusEnum = AuthService.serializeEnumForCandid(values.status);
+
+            await AuthService.callCanisterSafely(
+                Promise.resolve(actor),
+                'update_product_status',
+                selectedProduct.id,
+                statusEnum,
+                values.location || 'Unknown',
+                values.notes || `Status updated to ${values.status} by Admin`
+            );
+
+            message.success('Product status updated successfully');
+            setStatusModalVisible(false);
+            setSelectedProduct(null);
+            statusForm.resetFields();
+            loadDashboardData();
+        } catch (error) {
+            console.error('Failed to update product status:', error);
+            message.error(`Failed to update product status: ${error.message}`);
+        }
+    };
+
+    const handleTransferProduct = async (values) => {
+        try {
+            const actor = await AuthService.getSupplyChainActor();
+
+            await AuthService.callCanisterSafely(
+                Promise.resolve(actor),
+                'transfer_product',
+                selectedProduct.id,
+                values.to_user,
+                values.transfer_type,
+                values.notes || 'Product transferred by Admin'
+            );
+
+            message.success('Product transferred successfully');
+            setTransferModalVisible(false);
+            setSelectedProduct(null);
+            transferForm.resetFields();
+            loadDashboardData();
+        } catch (error) {
+            console.error('Failed to transfer product:', error);
+            message.error(`Failed to transfer product: ${error.message}`);
         }
     };
 
@@ -264,10 +345,6 @@ const Dashboard = () => {
         return statusMap[status] || 'default';
     };
 
-    const canUserCreateProduct = () => {
-        return currentUser && ['Admin', 'Supplier'].includes(currentUser.role);
-    };
-
     const safeProducts = Array.isArray(products) ? products : [];
     const safeUsers = Array.isArray(users) ? users : [];
 
@@ -284,6 +361,7 @@ const Dashboard = () => {
         { name: 'Transporters', value: safeUsers.filter(u => u?.role === 'Transporter').length },
         { name: 'Warehouses', value: safeUsers.filter(u => u?.role === 'Warehouse').length },
         { name: 'Retailers', value: safeUsers.filter(u => u?.role === 'Retailer').length },
+        { name: 'Admins', value: safeUsers.filter(u => u?.role === 'Admin').length },
     ];
 
     const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
@@ -306,6 +384,11 @@ const Dashboard = () => {
             ),
         },
         {
+            title: 'Batch Number',
+            dataIndex: 'batch_number',
+            key: 'batch_number',
+        },
+        {
             title: 'Price',
             dataIndex: 'price',
             key: 'price',
@@ -315,110 +398,102 @@ const Dashboard = () => {
             title: 'Quantity',
             dataIndex: 'quantity',
             key: 'quantity',
-            render: (quantity) => quantity || 0,
         },
         {
-            title: 'Category',
-            dataIndex: 'category',
-            key: 'category',
-            render: (category) => category || 'General',
+            title: 'Actions',
+            key: 'actions',
+            render: (_, record) => (
+                <Space>
+                    <Button
+                        type="link"
+                        size="small"
+                        icon={<EditOutlined />}
+                        onClick={() => {
+                            setSelectedProduct(record);
+                            setStatusModalVisible(true);
+                        }}
+                    >
+                        Update Status
+                    </Button>
+                    <Button
+                        type="link"
+                        size="small"
+                        icon={<ArrowRightOutlined />}
+                        onClick={() => {
+                            setSelectedProduct(record);
+                            setTransferModalVisible(true);
+                        }}
+                    >
+                        Transfer
+                    </Button>
+                </Space>
+            ),
         },
     ];
 
     if (loading) {
         return (
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
+            <div style={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                height: '400px'
+            }}>
                 <Spin size="large" />
-                <span style={{ marginLeft: 16 }}>Loading dashboard data...</span>
             </div>
         );
     }
 
     if (error) {
         return (
-            <div style={{ padding: 24 }}>
-                <Alert
-                    message="Dashboard Error"
-                    description={error}
-                    type="error"
-                    showIcon
-                    action={
-                        <Space>
-                            <Button onClick={handleRefresh} type="primary">
-                                Retry
-                            </Button>
-                        </Space>
-                    }
-                />
-                {healthStatus && (
-                    <Card title="Connection Status" style={{ marginTop: 16 }}>
-                        <Row gutter={16}>
-                            <Col span={6}>
-                                <Statistic
-                                    title="Authenticated"
-                                    value={healthStatus.authenticated ? 'Yes' : 'No'}
-                                    prefix={healthStatus.authenticated ? <CheckCircleOutlined /> : <ExclamationCircleOutlined />}
-                                    valueStyle={{ color: healthStatus.authenticated ? '#3f8600' : '#cf1322' }}
-                                />
-                            </Col>
-                            <Col span={6}>
-                                <Statistic
-                                    title="Connection"
-                                    value={healthStatus.connectionOk ? 'OK' : 'Failed'}
-                                    prefix={healthStatus.connectionOk ? <CheckCircleOutlined /> : <ExclamationCircleOutlined />}
-                                    valueStyle={{ color: healthStatus.connectionOk ? '#3f8600' : '#cf1322' }}
-                                />
-                            </Col>
-                            <Col span={6}>
-                                <Statistic
-                                    title="Environment"
-                                    value={healthStatus.environment}
-                                    prefix={<ExclamationCircleOutlined />}
-                                />
-                            </Col>
-                            <Col span={6}>
-                                <Statistic
-                                    title="Host"
-                                    value={healthStatus.host}
-                                    prefix={<ExclamationCircleOutlined />}
-                                />
-                            </Col>
-                        </Row>
-                    </Card>
-                )}
-            </div>
+            <Alert
+                message="Dashboard Loading Error"
+                description={error}
+                type="error"
+                showIcon
+                action={
+                    <Button onClick={handleRefresh} icon={<ReloadOutlined />}>
+                        Retry
+                    </Button>
+                }
+            />
         );
     }
 
     return (
-        <div style={{ padding: 24 }}>
-            <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
-                <Col>
-                    <h1>Supply Chain Dashboard</h1>
-                    {currentUser && (
-                        <p>Welcome back, {currentUser.name}! ({currentUser.role})</p>
-                    )}
-                </Col>
-                <Col>
+        <div style={{ padding: '0px' }}>
+            {/* Welcome Header */}
+            <Card style={{ marginBottom: '24px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                        <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 'bold' }}>
+                            {currentUser && `Welcome back, ${currentUser.name}! (Full Admin Access)`}
+                        </h1>
+                        <p style={{ margin: '8px 0 0', color: '#666' }}>
+                            Manage your complete supply chain operations from suppliers to retailers
+                        </p>
+                    </div>
                     <Space>
-                        <Tooltip title="Refresh Data">
-                            <Button icon={<ReloadOutlined />} onClick={handleRefresh} />
-                        </Tooltip>
-                        {canUserCreateProduct() && (
-                            <Button
-                                type="primary"
-                                icon={<PlusOutlined />}
-                                onClick={() => setModalVisible(true)}
-                            >
-                                Quick Create Product
-                            </Button>
-                        )}
+                        <Button
+                            type="primary"
+                            icon={<PlusOutlined />}
+                            onClick={() => setModalVisible(true)}
+                        >
+                            Create Product
+                        </Button>
+                        <Button
+                            icon={<ReloadOutlined />}
+                            onClick={handleRefresh}
+                        >
+                            Refresh
+                        </Button>
                     </Space>
-                </Col>
-            </Row>
+                </div>
+            </Card>
 
-            <Row gutter={16} style={{ marginBottom: 24 }}>
-                <Col xs={24} sm={12} md={6}>
+            {/* Statistics Cards */}
+            <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
+                <Col xs={24} sm={12} lg={6}>
                     <Card>
                         <Statistic
                             title="Total Products"
@@ -428,51 +503,53 @@ const Dashboard = () => {
                         />
                     </Card>
                 </Col>
-                <Col xs={24} sm={12} md={6}>
+                <Col xs={24} sm={12} lg={6}>
                     <Card>
                         <Statistic
-                            title="Active Users"
+                            title="Total Users"
                             value={safeUsers.length}
                             prefix={<UserOutlined />}
                             valueStyle={{ color: '#1890ff' }}
                         />
                     </Card>
                 </Col>
-                <Col xs={24} sm={12} md={6}>
+                <Col xs={24} sm={12} lg={6}>
                     <Card>
                         <Statistic
-                            title="Total Events"
+                            title="Active Transfers"
+                            value={statistics.totalTransfers}
+                            prefix={<TruckOutlined />}
+                            valueStyle={{ color: '#cf1322' }}
+                        />
+                    </Card>
+                </Col>
+                <Col xs={24} sm={12} lg={6}>
+                    <Card>
+                        <Statistic
+                            title="Events Tracked"
                             value={statistics.totalEvents}
                             prefix={<ClockCircleOutlined />}
                             valueStyle={{ color: '#722ed1' }}
                         />
                     </Card>
                 </Col>
-                <Col xs={24} sm={12} md={6}>
-                    <Card>
-                        <Statistic
-                            title="Total Transfers"
-                            value={statistics.totalTransfers}
-                            prefix={<TruckOutlined />}
-                            valueStyle={{ color: '#f5222d' }}
-                        />
-                    </Card>
-                </Col>
             </Row>
 
-            <Row gutter={16} style={{ marginBottom: 24 }}>
+            {/* Charts Row */}
+            <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
                 <Col xs={24} lg={12}>
-                    <Card title="Product Status Distribution">
+                    <Card title="Product Status Distribution" style={{ height: '400px' }}>
                         <ResponsiveContainer width="100%" height={300}>
                             <PieChart>
                                 <Pie
                                     data={pieData}
                                     cx="50%"
                                     cy="50%"
+                                    labelLine={false}
+                                    label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
                                     outerRadius={80}
                                     fill="#8884d8"
                                     dataKey="value"
-                                    label={({ name, value }) => `${name}: ${value}`}
                                 >
                                     {pieData.map((entry, index) => (
                                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -484,117 +561,321 @@ const Dashboard = () => {
                     </Card>
                 </Col>
                 <Col xs={24} lg={12}>
-                    <Card title="User Role Distribution">
+                    <Card title="User Roles Distribution" style={{ height: '400px' }}>
                         <ResponsiveContainer width="100%" height={300}>
                             <BarChart data={roleData}>
                                 <CartesianGrid strokeDasharray="3 3" />
                                 <XAxis dataKey="name" />
                                 <YAxis />
                                 <RechartsTooltip />
-                                <Bar dataKey="value" fill="#8884d8" />
+                                <Bar dataKey="value" fill="#1890ff" />
                             </BarChart>
                         </ResponsiveContainer>
                     </Card>
                 </Col>
             </Row>
 
-            <Row gutter={16}>
-                <Col xs={24} lg={14}>
-                    <Card title="Recent Products" extra={<Button type="link">View All</Button>}>
+            {/* Products Table and Recent Events */}
+            <Row gutter={[16, 16]}>
+                <Col xs={24} lg={16}>
+                    <Card title="Recent Products" extra={
+                        <Button type="link" onClick={() => setModalVisible(true)}>
+                            View All
+                        </Button>
+                    }>
                         <Table
-                            dataSource={safeProducts.slice(0, 5)}
+                            dataSource={safeProducts.slice(0, 10)}
                             columns={productColumns}
+                            rowKey="id"
                             pagination={false}
                             size="small"
-                            rowKey="id"
                         />
                     </Card>
                 </Col>
-                <Col xs={24} lg={10}>
-                    <Card title="Recent Events" extra={<Button type="link">View All</Button>}>
-                        <Timeline size="small">
-                            {recentEvents.map((event, index) => (
-                                <Timeline.Item
-                                    key={index}
-                                    color={event.event_type === 'PRODUCT_CREATED' ? 'green' : 'blue'}
-                                >
+                <Col xs={24} lg={8}>
+                    <Card title="Recent Events">
+                        <Timeline
+                            items={recentEvents.slice(0, 8).map((event, index) => ({
+                                key: index,
+                                children: (
                                     <div>
-                                        <strong>{event.event_type}</strong>
-                                        <br />
-                                        {event.description}
-                                        <br />
-                                        <small>{new Date(Number(event.timestamp) / 1000000).toLocaleString()}</small>
+                                        <div style={{ fontWeight: 'bold' }}>
+                                            {event.event_type || 'Unknown Event'}
+                                        </div>
+                                        <div style={{ fontSize: '12px', color: '#666' }}>
+                                            {event.description || 'No description'}
+                                        </div>
+                                        <div style={{ fontSize: '11px', color: '#999' }}>
+                                            {new Date(Number(event.timestamp) / 1000000).toLocaleDateString()}
+                                        </div>
                                     </div>
-                                </Timeline.Item>
-                            ))}
-                        </Timeline>
+                                ),
+                                color: index === 0 ? 'green' : 'blue'
+                            }))}
+                        />
                     </Card>
                 </Col>
             </Row>
 
+            {/* Create Product Modal */}
             <Modal
-                title="Quick Create Product"
-                visible={modalVisible}
-                onCancel={() => setModalVisible(false)}
+                title="Create New Product"
+                open={modalVisible}
+                onCancel={() => {
+                    setModalVisible(false);
+                    form.resetFields();
+                }}
                 footer={null}
+                width={600}
             >
-                <Form form={form} onFinish={handleQuickCreateProduct} layout="vertical">
-                    <Form.Item
-                        label="Product Name"
-                        name="name"
-                        rules={[{ required: true, message: 'Please enter product name' }]}
-                    >
-                        <Input placeholder="Enter product name" />
-                    </Form.Item>
+                <Form
+                    form={form}
+                    layout="vertical"
+                    onFinish={handleQuickCreateProduct}
+                >
+                    <Row gutter={16}>
+                        <Col span={12}>
+                            <Form.Item
+                                label="Product Name"
+                                name="name"
+                                rules={[{ required: true, message: 'Please enter product name' }]}
+                            >
+                                <Input placeholder="Enter product name" />
+                            </Form.Item>
+                        </Col>
+                        <Col span={12}>
+                            <Form.Item
+                                label="Category"
+                                name="category"
+                                rules={[{ required: true, message: 'Please select category' }]}
+                            >
+                                <Select placeholder="Select category">
+                                    <Option value="Electronics">Electronics</Option>
+                                    <Option value="Food">Food</Option>
+                                    <Option value="Clothing">Clothing</Option>
+                                    <Option value="Medical">Medical</Option>
+                                    <Option value="General">General</Option>
+                                </Select>
+                            </Form.Item>
+                        </Col>
+                    </Row>
+
                     <Form.Item
                         label="Description"
                         name="description"
                     >
-                        <Input.TextArea placeholder="Enter description" rows={3} />
+                        <Input.TextArea placeholder="Enter product description" rows={3} />
                     </Form.Item>
+
+                    <Row gutter={16}>
+                        <Col span={8}>
+                            <Form.Item
+                                label="Price ($)"
+                                name="price"
+                                rules={[{ required: true, message: 'Please enter price' }]}
+                            >
+                                <Input type="number" placeholder="0.00" />
+                            </Form.Item>
+                        </Col>
+                        <Col span={8}>
+                            <Form.Item
+                                label="Quantity"
+                                name="quantity"
+                                rules={[{ required: true, message: 'Please enter quantity' }]}
+                            >
+                                <Input type="number" placeholder="1" />
+                            </Form.Item>
+                        </Col>
+                        <Col span={8}>
+                            <Form.Item
+                                label="Origin"
+                                name="origin"
+                                rules={[{ required: true, message: 'Please enter origin' }]}
+                            >
+                                <Input placeholder="Manufacturing location" />
+                            </Form.Item>
+                        </Col>
+                    </Row>
+
                     <Form.Item
-                        label="Price"
-                        name="price"
-                        rules={[{ required: true, message: 'Please enter price' }]}
+                        label="Batch Number"
+                        name="batch_number"
                     >
-                        <Input type="number" placeholder="Enter price" prefix="$" />
+                        <Input placeholder="Auto-generated if empty" />
                     </Form.Item>
-                    <Form.Item
-                        label="Quantity"
-                        name="quantity"
-                        rules={[{ required: true, message: 'Please enter quantity' }]}
-                    >
-                        <Input type="number" placeholder="Enter quantity" />
-                    </Form.Item>
-                    <Form.Item
-                        label="Category"
-                        name="category"
-                    >
-                        <Select placeholder="Select category">
-                            <Option value="Electronics">Electronics</Option>
-                            <Option value="Food">Food</Option>
-                            <Option value="Clothing">Clothing</Option>
-                            <Option value="Books">Books</Option>
-                            <Option value="General">General</Option>
-                        </Select>
-                    </Form.Item>
-                    <Form.Item
-                        label="Origin"
-                        name="origin"
-                    >
-                        <Input placeholder="Enter origin location" />
-                    </Form.Item>
+
                     <Form.Item>
                         <Space>
                             <Button type="primary" htmlType="submit">
                                 Create Product
                             </Button>
-                            <Button onClick={() => setModalVisible(false)}>
+                            <Button onClick={() => {
+                                setModalVisible(false);
+                                form.resetFields();
+                            }}>
                                 Cancel
                             </Button>
                         </Space>
                     </Form.Item>
                 </Form>
+            </Modal>
+
+            {/* Update Status Modal */}
+            <Modal
+                title="Update Product Status"
+                open={statusModalVisible}
+                onCancel={() => {
+                    setStatusModalVisible(false);
+                    setSelectedProduct(null);
+                    statusForm.resetFields();
+                }}
+                footer={null}
+            >
+                {selectedProduct && (
+                    <div>
+                        <Descriptions style={{ marginBottom: '20px' }}>
+                            <Descriptions.Item label="Product">{selectedProduct.name}</Descriptions.Item>
+                            <Descriptions.Item label="Current Status">
+                                <Tag color={getStatusColor(selectedProduct.status)}>
+                                    {selectedProduct.status}
+                                </Tag>
+                            </Descriptions.Item>
+                        </Descriptions>
+
+                        <Form
+                            form={statusForm}
+                            layout="vertical"
+                            onFinish={handleUpdateProductStatus}
+                        >
+                            <Form.Item
+                                label="New Status"
+                                name="status"
+                                rules={[{ required: true, message: 'Please select new status' }]}
+                            >
+                                <Select placeholder="Select new status">
+                                    {getAvailableStatusTransitions(selectedProduct).map(transition => (
+                                        <Option key={transition.value} value={transition.value}>
+                                            {transition.label}
+                                        </Option>
+                                    ))}
+                                </Select>
+                            </Form.Item>
+
+                            <Form.Item
+                                label="Location"
+                                name="location"
+                            >
+                                <Input placeholder="Current location" />
+                            </Form.Item>
+
+                            <Form.Item
+                                label="Notes"
+                                name="notes"
+                            >
+                                <Input.TextArea placeholder="Additional notes" rows={3} />
+                            </Form.Item>
+
+                            <Form.Item>
+                                <Space>
+                                    <Button type="primary" htmlType="submit">
+                                        Update Status
+                                    </Button>
+                                    <Button onClick={() => {
+                                        setStatusModalVisible(false);
+                                        setSelectedProduct(null);
+                                        statusForm.resetFields();
+                                    }}>
+                                        Cancel
+                                    </Button>
+                                </Space>
+                            </Form.Item>
+                        </Form>
+                    </div>
+                )}
+            </Modal>
+
+            {/* Transfer Product Modal */}
+            <Modal
+                title="Transfer Product"
+                open={transferModalVisible}
+                onCancel={() => {
+                    setTransferModalVisible(false);
+                    setSelectedProduct(null);
+                    transferForm.resetFields();
+                }}
+                footer={null}
+            >
+                {selectedProduct && (
+                    <div>
+                        <Descriptions style={{ marginBottom: '20px' }}>
+                            <Descriptions.Item label="Product">{selectedProduct.name}</Descriptions.Item>
+                            <Descriptions.Item label="Current Status">
+                                <Tag color={getStatusColor(selectedProduct.status)}>
+                                    {selectedProduct.status}
+                                </Tag>
+                            </Descriptions.Item>
+                        </Descriptions>
+
+                        <Form
+                            form={transferForm}
+                            layout="vertical"
+                            onFinish={handleTransferProduct}
+                        >
+                            <Form.Item
+                                label="Transfer Type"
+                                name="transfer_type"
+                                rules={[{ required: true, message: 'Please select transfer type' }]}
+                            >
+                                <Select placeholder="Select transfer type">
+                                    <Option value="TO_WAREHOUSE">To Warehouse</Option>
+                                    <Option value="TO_TRANSPORTER">To Transporter</Option>
+                                    <Option value="TO_RETAILER">To Retailer</Option>
+                                    <Option value="INTERNAL">Internal Transfer</Option>
+                                </Select>
+                            </Form.Item>
+
+                            <Form.Item
+                                label="Recipient"
+                                name="to_user"
+                                rules={[{ required: true, message: 'Please select recipient' }]}
+                            >
+                                <Select
+                                    placeholder="Select recipient"
+                                    showSearch
+                                    optionFilterProp="children"
+                                >
+                                    {availableUsers.map(user => (
+                                        <Option key={user.id.toString()} value={user.id.toString()}>
+                                            {user.name} ({user.role})
+                                        </Option>
+                                    ))}
+                                </Select>
+                            </Form.Item>
+
+                            <Form.Item
+                                label="Transfer Notes"
+                                name="notes"
+                            >
+                                <Input.TextArea placeholder="Transfer notes and instructions" rows={3} />
+                            </Form.Item>
+
+                            <Form.Item>
+                                <Space>
+                                    <Button type="primary" htmlType="submit">
+                                        Transfer Product
+                                    </Button>
+                                    <Button onClick={() => {
+                                        setTransferModalVisible(false);
+                                        setSelectedProduct(null);
+                                        transferForm.resetFields();
+                                    }}>
+                                        Cancel
+                                    </Button>
+                                </Space>
+                            </Form.Item>
+                        </Form>
+                    </div>
+                )}
             </Modal>
         </div>
     );

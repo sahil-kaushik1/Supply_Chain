@@ -15,21 +15,18 @@ const UserRegistration = () => {
     const [success, setSuccess] = useState(false);
     const navigate = useNavigate();
 
-    // CRITICAL FIX: Proper enum handling for user roles
+    // Simplified - all users get Admin role automatically
     const USER_ROLES = {
-        SUPPLIER: 'Supplier',
-        TRANSPORTER: 'Transporter',
-        WAREHOUSE: 'Warehouse',
-        RETAILER: 'Retailer'
+        ADMIN: 'Admin'
     };
 
     const validateFormData = (values) => {
         const errors = [];
+
         const requiredFields = [
             { key: 'name', label: 'Full Name', minLength: 2 },
             { key: 'email', label: 'Email Address' },
             { key: 'phone', label: 'Phone Number' },
-            { key: 'role', label: 'Role' },
             { key: 'company_name', label: 'Company Name', minLength: 2 },
             { key: 'address', label: 'Address', minLength: 5 }
         ];
@@ -75,15 +72,10 @@ const UserRegistration = () => {
             }
         }
 
-        // Role validation
-        if (values.role && !Object.values(USER_ROLES).includes(values.role)) {
-            errors.push('Please select a valid role');
-        }
-
         return errors;
     };
 
-    // CRITICAL FIX: Enhanced form submission with proper enum serialization
+    // Enhanced form submission with automatic Admin role assignment
     const handleSubmit = async (values) => {
         try {
             setLoading(true);
@@ -100,33 +92,32 @@ const UserRegistration = () => {
 
             setProgress(25);
 
+            // Automatically assign Admin role for simplified system
             const cleanedData = {
                 name: values.name?.trim() || '',
                 email: values.email?.trim()?.toLowerCase() || '',
                 phone: values.phone?.trim() || '',
-                role: values.role || '',
+                role: 'Admin', // Always Admin for simplified system
                 company_name: values.company_name?.trim() || '',
                 address: values.address?.trim() || ''
             };
 
             setProgress(40);
-
             await AuthService.ensureReady();
             setProgress(50);
 
             const userManagementActor = await AuthService.getUserManagementActor();
             setProgress(60);
 
-            // CRITICAL FIX: Properly serialize role enum for Candid
+            // Properly serialize role enum for Candid
             const userRole = AuthService.serializeEnumForCandid(cleanedData.role);
-
             setProgress(70);
 
             const registrationCall = async () => {
                 return await userManagementActor.register_user(
                     cleanedData.name,
                     cleanedData.email,
-                    userRole, // FIXED: Properly serialized enum
+                    userRole,
                     cleanedData.company_name,
                     cleanedData.address,
                     cleanedData.phone
@@ -139,8 +130,7 @@ const UserRegistration = () => {
             if ('Ok' in result) {
                 setProgress(100);
                 setSuccess(true);
-                message.success('Registration successful! Welcome to the platform.');
-
+                message.success('Registration successful! You now have full admin access to the platform.');
                 form.resetFields();
                 setValidationErrors([]);
 
@@ -150,6 +140,7 @@ const UserRegistration = () => {
             } else {
                 throw new Error(result.Err || 'Registration failed');
             }
+
         } catch (error) {
             console.error('Registration failed:', error);
             setProgress(0);
@@ -182,26 +173,42 @@ const UserRegistration = () => {
     };
 
     const renderSuccessMessage = () => (
-        <Card style={{ textAlign: 'center' }}>
-            <CheckCircleOutlined style={{ fontSize: 48, color: '#52c41a', marginBottom: 16 }} />
-            <Title level={3}>Registration Successful!</Title>
-            <Text>Your account has been created successfully. Redirecting to dashboard...</Text>
-            <Progress percent={100} status="success" style={{ marginTop: 16 }} />
+        <Card style={{ textAlign: 'center', marginTop: '20px' }}>
+            <CheckCircleOutlined style={{ fontSize: '48px', color: '#52c41a', marginBottom: '16px' }} />
+            <Title level={3} style={{ color: '#52c41a' }}>Registration Successful!</Title>
+            <Text>
+                Welcome to the Supply Chain Management Platform! <br />
+                You have been granted full administrative access to all features.
+                <br />
+                Redirecting to dashboard...
+            </Text>
         </Card>
     );
 
     if (success) {
-        return renderSuccessMessage();
+        return (
+            <div style={{ padding: '20px', maxWidth: '600px', margin: '0 auto' }}>
+                {renderSuccessMessage()}
+            </div>
+        );
     }
 
     return (
-        <div style={{ maxWidth: 600, margin: '0 auto' }}>
-            <Card title="User Registration" bordered={false}>
+        <div style={{ padding: '20px', maxWidth: '600px', margin: '0 auto' }}>
+            <Card>
+                <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+                    <UserOutlined style={{ fontSize: '48px', color: '#1890ff', marginBottom: '16px' }} />
+                    <Title level={2}>Register for Supply Chain Platform</Title>
+                    <Text type="secondary">
+                        Register to get full administrative access to all supply chain features
+                    </Text>
+                </div>
+
                 {validationErrors.length > 0 && (
                     <Alert
-                        message="Validation Errors"
+                        message="Please fix the following errors:"
                         description={
-                            <ul style={{ margin: 0 }}>
+                            <ul style={{ marginBottom: 0 }}>
                                 {validationErrors.map((error, index) => (
                                     <li key={index}>{error}</li>
                                 ))}
@@ -209,8 +216,15 @@ const UserRegistration = () => {
                         }
                         type="error"
                         closable
-                        style={{ marginBottom: 16 }}
+                        style={{ marginBottom: '24px' }}
                     />
+                )}
+
+                {progress > 0 && progress < 100 && (
+                    <div style={{ marginBottom: '24px' }}>
+                        <Text>Registration Progress:</Text>
+                        <Progress percent={progress} status="active" />
+                    </div>
                 )}
 
                 <Form
@@ -218,7 +232,7 @@ const UserRegistration = () => {
                     layout="vertical"
                     onFinish={handleSubmit}
                     onFinishFailed={handleSubmitFailed}
-                    autoComplete="off"
+                    requiredMark={true}
                 >
                     <Row gutter={16}>
                         <Col span={24}>
@@ -251,11 +265,12 @@ const UserRegistration = () => {
                             >
                                 <Input
                                     prefix={<MailOutlined />}
-                                    placeholder="Enter your email"
+                                    placeholder="your.email@company.com"
                                     size="large"
                                 />
                             </Form.Item>
                         </Col>
+
                         <Col span={12}>
                             <Form.Item
                                 label="Phone Number"
@@ -266,7 +281,7 @@ const UserRegistration = () => {
                             >
                                 <Input
                                     prefix={<PhoneOutlined />}
-                                    placeholder="Enter your phone number"
+                                    placeholder="+1 (555) 123-4567"
                                     size="large"
                                 />
                             </Form.Item>
@@ -274,24 +289,7 @@ const UserRegistration = () => {
                     </Row>
 
                     <Row gutter={16}>
-                        <Col span={12}>
-                            <Form.Item
-                                label="Role"
-                                name="role"
-                                rules={[
-                                    { required: true, message: 'Please select your role' }
-                                ]}
-                            >
-                                <Select placeholder="Select your role" size="large">
-                                    {Object.entries(USER_ROLES).map(([key, value]) => (
-                                        <Option key={key} value={value}>
-                                            {value}
-                                        </Option>
-                                    ))}
-                                </Select>
-                            </Form.Item>
-                        </Col>
-                        <Col span={12}>
+                        <Col span={24}>
                             <Form.Item
                                 label="Company Name"
                                 name="company_name"
@@ -302,7 +300,7 @@ const UserRegistration = () => {
                             >
                                 <Input
                                     prefix={<BankOutlined />}
-                                    placeholder="Enter your company name"
+                                    placeholder="Your Company Name"
                                     size="large"
                                 />
                             </Form.Item>
@@ -319,31 +317,45 @@ const UserRegistration = () => {
                                     { min: 5, message: 'Address must be at least 5 characters' }
                                 ]}
                             >
-                                <Input
-                                    prefix={<HomeOutlined />}
-                                    placeholder="Enter your address"
+                                <Input.TextArea
+                                    placeholder="Company Address"
+                                    rows={3}
                                     size="large"
                                 />
                             </Form.Item>
                         </Col>
                     </Row>
 
+                    <Alert
+                        message="Admin Access Granted"
+                        description="All registered users receive full administrative privileges in this demo system, allowing complete control over suppliers, transporters, warehouses, and retailers."
+                        type="info"
+                        showIcon
+                        style={{ marginBottom: '24px' }}
+                    />
+
                     <Form.Item>
                         <Button
                             type="primary"
                             htmlType="submit"
-                            loading={loading}
                             size="large"
-                            style={{ width: '100%' }}
+                            loading={loading}
+                            block
+                            icon={<UserOutlined />}
                         >
-                            {loading ? 'Registering...' : 'Register'}
+                            {loading ? 'Registering...' : 'Register with Full Access'}
                         </Button>
                     </Form.Item>
-                </Form>
 
-                {progress > 0 && (
-                    <Progress percent={progress} style={{ marginTop: 16 }} />
-                )}
+                    <div style={{ textAlign: 'center' }}>
+                        <Text type="secondary">
+                            Already have an account?{' '}
+                            <Button type="link" onClick={() => navigate('/')}>
+                                Login here
+                            </Button>
+                        </Text>
+                    </div>
+                </Form>
             </Card>
         </div>
     );
